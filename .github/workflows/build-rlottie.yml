@@ -1,0 +1,54 @@
+name: Build rlottie JNI (.so)
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'native/**'
+      - '.github/workflows/build-rlottie.yml'
+
+env:
+  RLOTTIE_REF: ea06d2f29ba01b8d06c00a838d107f5e484ae59b
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: rlottie source
+        uses: actions/checkout@v4
+        with:
+          repository: Samsung/rlottie
+          ref: ${{ env.RLOTTIE_REF }}
+          path: rlottie
+
+      - name: Configure (NDK, arm64-v8a)
+        run: |
+          NDK="${ANDROID_NDK_LATEST_HOME:-$ANDROID_NDK_HOME}"
+          cmake -S native -B build -G Ninja \
+            -DCMAKE_TOOLCHAIN_FILE="$NDK/build/cmake/android.toolchain.cmake" \
+            -DANDROID_ABI=arm64-v8a \
+            -DANDROID_PLATFORM=android-21 \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DRLOTTIE_DIR="$GITHUB_WORKSPACE/rlottie"
+
+      - name: Build
+        run: cmake --build build --target rlottie_jni
+
+      - name: Strip and verify JNI symbols
+        run: |
+          NDK="${ANDROID_NDK_LATEST_HOME:-$ANDROID_NDK_HOME}"
+          BIN="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          mkdir -p out
+          cp build/librlottie_jni.so out/
+          "$BIN/llvm-strip" --strip-unneeded out/librlottie_jni.so
+          ls -l out/
+          "$BIN/llvm-nm" -D out/librlottie_jni.so | grep Java_dev_legion_legionClient_RLottie_nCreate
+          "$BIN/llvm-nm" -D out/librlottie_jni.so | grep Java_dev_legion_legionClient_RLottie_nRender
+          "$BIN/llvm-nm" -D out/librlottie_jni.so | grep Java_dev_legion_legionClient_RLottie_nDestroy
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: librlottie_jni-arm64-v8a
+          path: out/librlottie_jni.so

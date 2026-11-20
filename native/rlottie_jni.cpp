@@ -2,15 +2,15 @@
 #include <android/bitmap.h>
 #include "rlottie_core.h"
 
-// Java class: dev.legion.legionClient.RLottie
+// rlottie -fvisibility=hidden PUBLIC dey ar NDK-r JNIEXPORT visibility dey na, tai explicit export
+#define JNI_VISIBLE __attribute__((visibility("default")))
 
-extern "C" JNIEXPORT jlong JNICALL
+extern "C" JNI_VISIBLE jlong JNICALL
 Java_dev_legion_legionClient_RLottie_nCreate(JNIEnv *env, jclass, jstring json, jstring key,
                                              jintArray outInfo) {
     if (!json) return 0;
     const char *j = env->GetStringUTFChars(json, nullptr);
     const char *k = key ? env->GetStringUTFChars(key, nullptr) : nullptr;
-    // NOTE: rlottie -fno-exceptions flag PUBLIC dey, tai ekhane try/catch lekha jay na
     LottieHandle *h = lottieCreate(j, k);
     env->ReleaseStringUTFChars(json, j);
     if (k) env->ReleaseStringUTFChars(key, k);
@@ -22,12 +22,12 @@ Java_dev_legion_legionClient_RLottie_nCreate(JNIEnv *env, jclass, jstring json, 
     return reinterpret_cast<jlong>(h);
 }
 
-extern "C" JNIEXPORT void JNICALL
+extern "C" JNI_VISIBLE void JNICALL
 Java_dev_legion_legionClient_RLottie_nDestroy(JNIEnv *, jclass, jlong ptr) {
     delete reinterpret_cast<LottieHandle *>(ptr);
 }
 
-extern "C" JNIEXPORT jboolean JNICALL
+extern "C" JNI_VISIBLE jboolean JNICALL
 Java_dev_legion_legionClient_RLottie_nRender(JNIEnv *env, jclass, jlong ptr, jint frame, jobject bitmap) {
     LottieHandle *h = reinterpret_cast<LottieHandle *>(ptr);
     if (!h || !bitmap) return JNI_FALSE;

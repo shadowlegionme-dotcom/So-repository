@@ -31,6 +31,7 @@ jobs:
             -DANDROID_ABI=arm64-v8a \
             -DANDROID_PLATFORM=android-21 \
             -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
             -DRLOTTIE_DIR="$GITHUB_WORKSPACE/rlottie"
 
       - name: Build

@@ -8,7 +8,8 @@ on:
       - '.github/workflows/build-rlottie.yml'
 
 env:
-  RLOTTIE_REF: ea06d2f29ba01b8d06c00a838d107f5e484ae59b
+  # Telegram-er nijer rlottie fork (animated emoji ar sticker er jonno banano)
+  RLOTTIE_REF: 53c9679069eb6b6513ccc3c892ef4f4a760658da
 
 jobs:
   build:
@@ -16,12 +17,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: rlottie source
+      - name: rlottie source (Telegram fork)
         uses: actions/checkout@v4
         with:
-          repository: Samsung/rlottie
+          repository: TelegramMessenger/rlottie
           ref: ${{ env.RLOTTIE_REF }}
           path: rlottie
+
+      - name: Patch rlottie for modern compilers
+        run: sed -i 's/-Werror/-Wno-error/' rlottie/CMakeLists.txt
 
       - name: Configure (NDK, arm64-v8a)
         run: |
@@ -32,6 +36,7 @@ jobs:
             -DANDROID_PLATFORM=android-21 \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
+            -DCMAKE_CXX_FLAGS="-include limits" \
             -DRLOTTIE_DIR="$GITHUB_WORKSPACE/rlottie"
 
       - name: Build

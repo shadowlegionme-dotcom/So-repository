@@ -1,0 +1,75 @@
+name: Build libvpx JNI (.so)
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'native_vpx/**'
+      - '.github/workflows/build-vpx.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: libvpx source
+        uses: actions/checkout@v4
+        with:
+          repository: webmproject/libvpx
+          ref: v1.15.2
+          path: libvpx
+
+      - name: Build libvpx.a (arm64-v8a)
+        run: |
+          NDK="${ANDROID_NDK_LATEST_HOME:-$ANDROID_NDK_HOME}"
+          BIN="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          echo "NDK=$NDK"
+          export CC="$BIN/aarch64-linux-android21-clang"
+          export CXX="$BIN/aarch64-linux-android21-clang++"
+          export AS="$BIN/aarch64-linux-android21-clang"
+          export LD="$BIN/aarch64-linux-android21-clang"
+          export AR="$BIN/llvm-ar"
+          export NM="$BIN/llvm-nm"
+          export STRIP="$BIN/llvm-strip"
+          export RANLIB="$BIN/llvm-ranlib"
+          mkdir -p vpxbuild && cd vpxbuild
+          ../libvpx/configure --target=arm64-android-gcc \
+            --disable-examples --disable-tools --disable-docs --disable-unit-tests \
+            --disable-vp8-encoder --disable-vp9-encoder \
+            --enable-vp8-decoder --enable-vp9-decoder \
+            --enable-pic --enable-static --disable-shared \
+            --disable-runtime-cpu-detect --disable-install-bins \
+            --extra-cflags="-O2 -fvisibility=hidden"
+          make -j"$(nproc)" libvpx.a
+          ls -l libvpx.a
+
+      - name: Configure + build vpx_jni
+        run: |
+          NDK="${ANDROID_NDK_LATEST_HOME:-$ANDROID_NDK_HOME}"
+          cmake -S native_vpx -B build -G Ninja \
+            -DCMAKE_TOOLCHAIN_FILE="$NDK/build/cmake/android.toolchain.cmake" \
+            -DANDROID_ABI=arm64-v8a \
+            -DANDROID_PLATFORM=android-21 \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DVPX_SRC_DIR="$GITHUB_WORKSPACE/libvpx" \
+            -DVPX_LIB="$GITHUB_WORKSPACE/vpxbuild/libvpx.a"
+          cmake --build build --target vpx_jni
+
+      - name: Strip + verify JNI symbols
+        run: |
+          NDK="${ANDROID_NDK_LATEST_HOME:-$ANDROID_NDK_HOME}"
+          BIN="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          OUT=out/app/src/main/jniLibs/arm64-v8a
+          mkdir -p $OUT
+          cp build/libvpx_jni.so $OUT/
+          "$BIN/llvm-strip" --strip-unneeded $OUT/libvpx_jni.so
+          ls -l $OUT
+          for s in nOpen nPtsMs nDecode nClose; do
+            "$BIN/llvm-nm" -D $OUT/libvpx_jni.so | grep Java_dev_legion_legionClient_VpxWebm_$s
+          done
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: libvpx_jni-arm64-v8a
+          path: out/app/src/main/jniLibs/arm64-v8a/libvpx_jni.so
